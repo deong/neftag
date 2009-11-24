@@ -5,8 +5,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <assert.h>
 #include "tiff.h"
 #include "util.h"
+#include "csv.h"
+#include "nmea.h"
 #include "nikond90.h"
 
 int main(int argc, char** argv)
@@ -14,19 +18,32 @@ int main(int argc, char** argv)
     unsigned int offset;
     unsigned int i;
     FILE* fp;
+    FILE* gpsf;
     ifd_t zeroth_ifd;
     ifd_t exif_ifd;
     ifd_t gps_info_ifd;
-    ifd_t* sub_ifds;
-    unsigned int gps_offset;
+    ifd_t* sub_ifds = 0;
+    unsigned int gps_offset = 0;
+    int num_rows = 0;
+    waypoint_t* rows = (waypoint_t*)malloc(1024 * sizeof(waypoint_t));
     
-    if(argc != 2)
+    if(argc != 3)
     {
-        printf("usage: nefread <rawfile>\n");
+        printf("usage: nefread <rawfile> <gpslog>\n");
         return EXIT_FAILURE;
     }
+
+    /* parse the gps log file */
+    if((gpsf = fopen(argv[2], "r")) == NULL)
+    {
+        fprintf(stderr, "could not open gps log file: '%s'\n", argv[2]);
+        return EXIT_FAILURE;
+    }
+    parse_nmea_file(gpsf, &rows, &num_rows);
     
-    if((fp = fopen(argv[1], "rb")) == NULL)
+
+    /* open and parse the image files */
+    if((fp = fopen(argv[1], "rb+")) == NULL)
     {
         fprintf(stderr, "could not open raw file '%s'\n", argv[1]);
         return EXIT_FAILURE;
@@ -43,21 +60,17 @@ int main(int argc, char** argv)
     offset = read_uint(fp);
     fseek(fp, offset, SEEK_SET);
 
-    printf("loading 0thIFD\n");
     ifd_load(fp, &zeroth_ifd);
-
     for(i=0; i<zeroth_ifd.count; ++i)
     {
         if(zeroth_ifd.dirs[i].tag == ExifIFDPointer) /* Exif IFD pointer */
         {
-            printf("loading ExifIFD\n");
             offset = zeroth_ifd.dirs[i].uint_values[0];
             fseek(fp, offset, SEEK_SET);
             ifd_load(fp, &exif_ifd);
         }
         else if(zeroth_ifd.dirs[i].tag == GPSInfoIFDPointer) /* GPS Info IFD pointer */
         {
-            printf("loading GPSInfoIFD\n");
             gps_offset = zeroth_ifd.dirs[i].uint_values[0];
             fseek(fp, gps_offset, SEEK_SET);
             ifd_load(fp, &gps_info_ifd);
@@ -68,7 +81,6 @@ int main(int argc, char** argv)
             sub_ifds = (ifd_t*)malloc(zeroth_ifd.dirs[i].count * sizeof(ifd_t));
             for(j=0; j<zeroth_ifd.dirs[i].count; ++j)
             {
-                printf("loading SubIFD%d\n", j);
                 offset = zeroth_ifd.dirs[i].uint_values[j];
                 fseek(fp, offset, SEEK_SET);
                 ifd_load(fp, &sub_ifds[j]);
@@ -76,10 +88,21 @@ int main(int argc, char** argv)
         }
     }
 
-    ifd_free(&zeroth_ifd);
-    ifd_free(&exif_ifd);
-    ifd_free(&gps_info_ifd);
+    assert(gps_offset > 0);
+
+    if(sub_ifds)
+        free(sub_ifds);
+    for(i=0; i<num_rows; ++i)
+    {
+        if(rows[i].record_type == GPGGA)
+            free(rows[i].gga);
+        else if(rows[i].record_type == GPRMC)
+            free(rows[i].rmc);
+    }
+    free(rows);
     
     fclose(fp);
-    return 0;
+    fclose(gpsf);
+    
+    return EXIT_SUCCESS;
 }

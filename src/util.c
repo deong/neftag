@@ -176,4 +176,3 @@ void swap_endian8(unsigned long* x)
         ((*x>>40) & 0x000000000000FF00) |
         (*x<<56);
 }
-

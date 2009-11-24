@@ -26,17 +26,12 @@ void ifd_load(FILE* f, ifd_t* ifd)
     ifd->count = read_ushort(f);
     ifd->dirs = (direntry_t*)malloc(ifd->count * sizeof(direntry_t));
 
-    printf("ifd->count = %d\n\n", ifd->count);
-    
     /* read each directory entry */
     for(i=0; i<ifd->count; ++i)
     {
         ifd->dirs[i].tag = read_ushort(f);
         ifd->dirs[i].type = read_ushort(f);
         ifd->dirs[i].count = read_uint(f);
-        printf("\tifd->dirs[%d].tag = %x\n", i, ifd->dirs[i].tag);
-        printf("\tifd->dirs[%d].type = %d\n", i, ifd->dirs[i].type);
-        printf("\tifd->dirs[%d].count = %u\n", i, ifd->dirs[i].count);
         
         switch(ifd->dirs[i].type)
         {
@@ -120,7 +115,6 @@ void ifd_load(FILE* f, ifd_t* ifd)
             
             /* read the offset where the data is stored */
             unsigned int dataloc = read_uint(f);
-            printf("\toffset = %x\n", dataloc);
             
             /* save the current offset */
             unsigned int cpos = ftell(f);
@@ -169,45 +163,6 @@ void ifd_load(FILE* f, ifd_t* ifd)
             /* and jump back */
             fseek(f, cpos, SEEK_SET);
         }
-
-        printf("\tifd->dirs[i].values = ");
-        for(j=0; j<ifd->dirs[i].count; ++j)
-        {
-            switch(ifd->dirs[i].type)
-            {
-            case BYTE:
-            case ASCII:
-            case UNDEFINED:
-                printf("%u ", ifd->dirs[i].byte_values[j]);
-                break;
-            case SBYTE:
-                printf("%d ", ifd->dirs[i].sbyte_values[j]);
-                break;
-            case SHORT:
-                printf("%u ", ifd->dirs[i].ushort_values[j]);
-                break;
-            case SSHORT:
-                printf("%d ", ifd->dirs[i].short_values[j]);
-                break;
-            case LONG:
-                printf("%u ", ifd->dirs[i].uint_values[j]);
-                break;
-            case SLONG:
-                printf("%d ", ifd->dirs[i].int_values[j]);
-                break;
-            case FLOAT:
-                printf("%f ", ifd->dirs[i].float_values[j]);
-                break;
-            case DOUBLE:
-                printf("%lf ", ifd->dirs[i].double_values[j]);
-                break;
-            case RATIONAL:
-                printf("%u/%u ", ifd->dirs[i].rational_values[j].numerator,
-                       ifd->dirs[i].rational_values[j].denominator);
-                break;
-            }
-        }
-        printf("\n\n");
     }
     
     /* read the next ifd offset */
@@ -358,9 +313,10 @@ void ifd_write(FILE* f, ifd_t* ifd)
         else
         {
             /* must write a pointer to where the data will be written */
-            unsigned int cpos = ftell(f);
+            unsigned int cpos;
             unsigned int pos = ifd_value_offset + value_bytes_written;
             write_uint(f, pos);
+            cpos = ftell(f);
 
             /* now go to that location and write the data */
             fseek(f, pos, SEEK_SET);
@@ -421,5 +377,3 @@ void ifd_write(FILE* f, ifd_t* ifd)
     /* and finally, write the offset to the next ifd */
     write_uint(f, ifd->next_offset);
 }
-
-        
