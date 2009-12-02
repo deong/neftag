@@ -9,6 +9,6 @@
 #define NUM_TOKENS 20
 #define MAX_TOKEN_LEN 80
 
-void parse_line(char* line, char** toks);
+void parse_line(char* line, char* sep, char** toks);
 
 #endif

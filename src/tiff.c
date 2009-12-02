@@ -6,8 +6,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include "tiff.h"
 #include "util.h"
+#include "csv.h"
+#include "date.h"
 
 /* size in bytes of each of the TIFF data types */
 unsigned int type_bytes[13] = {-1, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8};
@@ -376,4 +379,88 @@ void ifd_write(FILE* f, ifd_t* ifd)
 
     /* and finally, write the offset to the next ifd */
     write_uint(f, ifd->next_offset);
+}
+
+void print_values(direntry_t* dir)
+{
+    int i;
+    
+    printf("tag:    %x\n", dir->tag);
+    printf("type:   %d\n", dir->type);
+    printf("count:  %d\n", dir->count);
+    printf("values:");
+    for(i=0; i<dir->count; ++i)
+    {
+        switch(dir->type)
+        {
+        case BYTE:
+        case ASCII:
+        case SBYTE:
+        case UNDEFINED:
+            if(i==0)
+                printf(" ");
+            printf("%c", dir->byte_values[i]);
+            break;
+        case SHORT:
+            printf(" %hu", dir->ushort_values[i]);
+            break;
+        case SSHORT:
+            printf(" %hd", dir->short_values[i]);
+            break;
+        case LONG:
+            printf(" %u", dir->uint_values[i]);
+            break;
+        case SLONG:
+            printf(" %d", dir->int_values[i]);
+            break;
+        case FLOAT:
+            printf(" %f", dir->float_values[i]);
+            break;
+        case DOUBLE:
+            printf(" %lf", dir->double_values[i]);
+            break;
+        case RATIONAL:
+            printf(" %u/%u", dir->rational_values[i].numerator,
+                dir->rational_values[i].denominator);
+            break;
+        default:
+            fprintf(stderr, "attempt to print invalid type '%d'\n", dir->type);
+            break;
+        }
+    }
+    printf("\n");
+}
+
+/*
+ * parse the weird date-time format from tiff file to normal
+ * time structure
+ */
+void parse_datetime(const char* dt, struct tm* t)
+{
+    char* tmp = (char*)malloc(strlen(dt));
+    char** toks;
+    const int NUM_DT_TOKENS = 6;
+    const int MAX_DT_TOKEN_LEN = 4;
+    int i;
+    
+    /* make a backup copy of the string */
+    strncpy(tmp, dt, strlen(dt));
+
+    /* init some memory to use to parse the date string */
+    toks = (char**)malloc(NUM_DT_TOKENS * sizeof(char*));
+    for(i=0; i<NUM_DT_TOKENS; ++i)
+    {
+        toks[i] = (char*)malloc((MAX_DT_TOKEN_LEN+1) * sizeof(char));
+        *toks[i] = '\0';
+    }
+
+    /* parse the line */
+    parse_line(tmp, ": ", toks);
+
+    t->tm_year = atoi(toks[0]) - 1900;
+    t->tm_mon = atoi(toks[1]) - 1;
+    t->tm_mday = atoi(toks[2]);
+    t->tm_hour = atoi(toks[3]);
+    t->tm_min = atoi(toks[4]);
+    t->tm_sec = atoi(toks[5]);
 }

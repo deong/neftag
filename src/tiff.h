@@ -3,6 +3,8 @@
  * basic constants for dealing with tiff files
  */
 
+#include <time.h>
+
 #ifndef _TIFF_H_
 #define _TIFF_H_
 
@@ -64,5 +66,7 @@ void ifd_load(FILE* f, ifd_t* ifd);
 void ifd_free(ifd_t* ifd);
 int valid_tiff_file(FILE* f);
 void ifd_write(FILE* f, ifd_t* ifd);
+void print_values(direntry_t* dir);
+void parse_datetime(const char* dt, struct tm* t);
 
 #endif

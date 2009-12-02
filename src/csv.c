@@ -8,7 +8,7 @@
 #include <string.h>
 #include "csv.h"
 
-void parse_line(char* line, char** toks)
+void parse_line(char* line, char* sep, char** toks)
 {
     char*  curr;
     char*  p;
@@ -17,7 +17,7 @@ void parse_line(char* line, char** toks)
     i=0;
     while(line != NULL && i < NUM_TOKENS)
     {
-        curr = strsep(&line, ",");
+        curr = strsep(&line, sep);
         if((p = strchr(curr, '\r')) != NULL)
             *p = '\0';
         else if((p = strchr(curr, '\n')) != NULL)
