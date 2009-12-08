@@ -8,6 +8,7 @@
 #include <string.h>
 #include <assert.h>
 #include <time.h>
+#include <unistd.h>
 #include "tiff.h"
 #include "util.h"
 #include "csv.h"
@@ -15,13 +16,20 @@
 #include "nikond90.h"
 #include "date.h"
 
-#define TIME_ZONE_OFFSET 6
+static void print_usage();
+
+static void print_usage()
+{
+    printf("usage: d90tag [-o utc_offset] <gpslog> <rawfile>+\n\n");
+    printf("\tnote that utc_offset is specified as X where GMT=local+X,\n");
+    printf("\te.g., CST is GMT-6, so to tag images taken in CST, specify\n");
+    printf("\t-o6, not -o-6\n\n");
+}
 
 int main(int argc, char** argv)
 {
     unsigned int offset;
     unsigned int i;
-    unsigned int fnum;
     FILE* fp;
     FILE* gpsf;
     ifd_t zeroth_ifd;
@@ -29,35 +37,53 @@ int main(int argc, char** argv)
     unsigned int gps_offset = 0;
     int num_rows = 0;
     waypoint_t* rows = (waypoint_t*)malloc(1024 * sizeof(waypoint_t));
+    char ch;
+    int tzoffset = 0;
     
     if(argc < 3)
     {
-        printf("usage: d90tag <gpslog> <rawfile>+\n");
+        print_usage();
         return EXIT_FAILURE;
     }
 
-    /* parse the gps log file */
-    if((gpsf = fopen(argv[1], "r")) == NULL)
+    while((ch = getopt(argc, argv, "ho:")) != -1)
     {
-        fprintf(stderr, "could not open gps log file: '%s'\n", argv[2]);
+        switch(ch)
+        {
+        case 'o': // time zone offset from UTC
+            tzoffset = atoi(optarg);
+            break;
+        case 'h':
+            print_usage();
+            return EXIT_SUCCESS;
+        default:
+            printf("unrecognized option: %c\n", ch);
+            return EXIT_SUCCESS;
+        }
+    }
+
+    /* parse the gps log file */
+    if((gpsf = fopen(argv[optind], "r")) == NULL)
+    {
+        fprintf(stderr, "could not open gps log file: '%s'\n", argv[optind]);
         return EXIT_FAILURE;
     }
     parse_nmea_file(gpsf, &rows, &num_rows);
     
 
     /* open and parse the image files */
-    for(fnum=2; fnum<argc; ++fnum)
+    for(++optind; optind<argc; ++optind)
     {
-        if((fp = fopen(argv[fnum], "rb+")) == NULL)
+        if((fp = fopen(argv[optind], "rb+")) == NULL)
         {
-            fprintf(stderr, "could not open raw file '%s'...skipping\n", argv[fnum]);
+            fprintf(stderr, "could not open raw file '%s'...skipping\n", argv[optind]);
             continue;
         }
 
         if(!valid_tiff_file(fp))
         {
             fprintf(stderr, "error reading raw file '%s'; invalid tiff header...skipping\n",
-                    argv[fnum]);
+                    argv[optind]);
             continue;
         }
 
@@ -87,13 +113,13 @@ int main(int argc, char** argv)
                 ifd_t gd;
                 
                 parse_datetime((const char*)zeroth_ifd.dirs[i].byte_values, &t);
-                add_offset(&t, TIME_ZONE_OFFSET);
+                add_offset(&t, tzoffset);
                 utc_time = timegm(&t);
 
                 match = find_location_at(rows, num_rows, utc_time, 3600);
                 if(!match)
                 {
-                    printf("no match found within 1 hour of photo '%s'...skipping\n", argv[fnum]);
+                    printf("no match found within 1 hour of photo '%s'...skipping\n", argv[optind]);
                     break;
                 }
                 
@@ -171,7 +197,7 @@ int main(int argc, char** argv)
                 fseek(fp, gps_offset, SEEK_SET);
                 ifd_write(fp, &gd);
 
-                printf("file '%s' geotagged successfully...\n", argv[fnum]);
+                printf("file '%s' geotagged successfully...\n", argv[optind]);
                 ifd_free(&gd);
                 break;
             }
