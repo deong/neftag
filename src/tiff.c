@@ -28,14 +28,13 @@ void ifd_load(FILE* f, ifd_t* ifd)
     /* get the number of directory entries */
     ifd->count = read_ushort(f);
     ifd->dirs = (direntry_t*)malloc(ifd->count * sizeof(direntry_t));
-
+    
     /* read each directory entry */
     for(i=0; i<ifd->count; ++i)
     {
         ifd->dirs[i].tag = read_ushort(f);
         ifd->dirs[i].type = read_ushort(f);
         ifd->dirs[i].count = read_uint(f);
-        
         switch(ifd->dirs[i].type)
         {
         case BYTE:
@@ -451,7 +450,7 @@ void parse_datetime(const char* dt, struct tm* t)
     for(i=0; i<NUM_DT_TOKENS; ++i)
     {
         toks[i] = (char*)malloc((MAX_DT_TOKEN_LEN+1) * sizeof(char));
-        *toks[i] = '\0';
+        //*toks[i] = '\0';
     }
 
     /* parse the line */

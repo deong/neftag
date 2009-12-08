@@ -22,6 +22,7 @@ void parse_line(char* line, char* sep, char** toks)
             *p = '\0';
         else if((p = strchr(curr, '\n')) != NULL)
             *p = '\0';
-        strncpy(toks[i++], curr, MAX_TOKEN_LEN);
+        //strncpy(toks[i++], curr, MAX_TOKEN_LEN);
+        toks[i++] = curr;
     }
 }

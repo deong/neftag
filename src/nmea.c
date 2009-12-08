@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include "nmea.h"
 #include "util.h"
 #include "csv.h"
@@ -14,16 +15,10 @@ void parse_nmea_file(FILE* fp, waypoint_t** rows, int* num_recs)
 {
     char** toks;
     char*  line;
-    int    i;
     int    max_recs = 1024;
     
     /* init some memory to use to parse the nmea file */
     toks = (char**)malloc(NUM_TOKENS * sizeof(char*));
-    for(i=0; i<NUM_TOKENS; ++i)
-    {
-        toks[i] = (char*)malloc(MAX_TOKEN_LEN * sizeof(char));
-        *toks[i] = '\0';
-    }
 
     /* parse each GPRMC record */
     *num_recs = 0;
@@ -56,8 +51,6 @@ void parse_nmea_file(FILE* fp, waypoint_t** rows, int* num_recs)
     }
 
     /* free the memory used by the nmea parsing */
-    for(i=0; i<NUM_TOKENS; ++i)
-        free(toks[i]);
     free(toks);
     free(line);
 }
@@ -98,4 +91,33 @@ void init_rmc_rec(rmc_t* rec, char** toks)
     rec->lon_ref = toks[6][0];
     rec->speed = atof(toks[7]);
     rec->heading = atof(toks[8]);
+}
+
+waypoint_t* find_location_at(waypoint_t* rows, unsigned int nrows, time_t ts, int epsilon)
+{
+    int low = 0;
+    int mid;
+    int high = nrows - 1;
+    
+    while(low < high)
+    {
+        mid = (low + high) / 2;
+        if(rows[mid].rmc->when < ts)
+            low = mid;
+        else if(rows[mid].rmc->when > ts)
+            high = mid;
+        else
+            return &rows[mid];
+    }
+
+    /* low has passed high, so check which is closer to desired time */
+    if(fabs(rows[low].rmc->when - ts) < fabs(rows[high].rmc->when - ts) &&
+       fabs(rows[low].rmc->when - ts) < epsilon)
+        return &rows[low];
+    else if(fabs(rows[high].rmc->when - ts) < fabs(rows[low].rmc->when - ts) &&
+            fabs(rows[high].rmc->when - ts) < epsilon)
+        return &rows[high];
+
+    /* no record found within required time limit */
+    return NULL;
 }
