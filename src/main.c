@@ -9,6 +9,7 @@
 #include <assert.h>
 #include <time.h>
 #include <unistd.h>
+#include <math.h>
 #include "tiff.h"
 #include "util.h"
 #include "csv.h"
@@ -18,7 +19,7 @@
 
 static void print_usage();
 
-static void print_usage()
+void print_usage()
 {
     printf("usage: d90tag [-o utc_offset] <gpslog> <rawfile>+\n\n");
     printf("\tnote that utc_offset is specified as X where GMT=local+X,\n");
@@ -36,7 +37,7 @@ int main(int argc, char** argv)
     ifd_t gps_info_ifd;
     unsigned int gps_offset = 0;
     int num_rows = 0;
-    waypoint_t* rows = (waypoint_t*)malloc(1024 * sizeof(waypoint_t));
+    sentence_t* rows = (sentence_t*)malloc(1024 * sizeof(sentence_t));
     char ch;
     int tzoffset = 0;
     
@@ -109,8 +110,9 @@ int main(int argc, char** argv)
             {
                 struct tm t;
                 unsigned int utc_time;
-                waypoint_t* match;
+                sentence_t* match;
                 ifd_t gd;
+                int index = 0;
                 
                 parse_datetime((const char*)zeroth_ifd.dirs[i].byte_values, &t);
                 add_offset(&t, tzoffset);
@@ -124,80 +126,115 @@ int main(int argc, char** argv)
                 }
                 
                 /* now write the gps info ifd structure */
-                gd.count = 7;
+                if(fabs(match->rmc->geoid_ht) > 1e-3)
+                    gd.count = 10;
+                else
+                    gd.count = 7;
                 gd.dirs = (direntry_t*)malloc(gd.count * sizeof(direntry_t));
                 gd.next_offset = gps_info_ifd.next_offset;
                 
-                gd.dirs[0].tag = GPSVersionID;
-                gd.dirs[0].type = BYTE;
-                gd.dirs[0].count = 4;
-                gd.dirs[0].byte_values = (unsigned char*)malloc(gd.dirs[0].count * sizeof(char));
-                gd.dirs[0].byte_values[0] = 2;
-                gd.dirs[0].byte_values[1] = 2;
-                gd.dirs[0].byte_values[2] = 0;
-                gd.dirs[0].byte_values[3] = 0;
+                gd.dirs[index].tag = GPSVersionID;
+                gd.dirs[index].type = BYTE;
+                gd.dirs[index].count = 4;
+                gd.dirs[index].byte_values = (unsigned char*)malloc(gd.dirs[index].count * sizeof(char));
+                gd.dirs[index].byte_values[0] = 2;
+                gd.dirs[index].byte_values[1] = 2;
+                gd.dirs[index].byte_values[2] = 0;
+                gd.dirs[index].byte_values[3] = 0;
+                ++index;
                 
-                gd.dirs[1].tag = GPSLatitudeRef;
-                gd.dirs[1].type = ASCII;
-                gd.dirs[1].count = 2;
-                gd.dirs[1].byte_values = (unsigned char*)malloc(gd.dirs[1].count);
-                snprintf((char*)gd.dirs[1].byte_values, gd.dirs[1].count, "%c", match->rmc->lat_ref);
-            
-                gd.dirs[2].tag = GPSLatitude;
-                gd.dirs[2].type = RATIONAL;
-                gd.dirs[2].count = 3;
-                gd.dirs[2].rational_values = (rational_t*)malloc(gd.dirs[2].count * sizeof(rational_t));
-                gd.dirs[2].rational_values[0].numerator = (int)match->rmc->latitude / 100;
-                gd.dirs[2].rational_values[0].denominator = 1;
-                gd.dirs[2].rational_values[1].numerator = (int)match->rmc->latitude % 100;
-                gd.dirs[2].rational_values[1].denominator = 1;
-                gd.dirs[2].rational_values[2].numerator = (int)(match->rmc->latitude * 10000) % 10000;
-                gd.dirs[2].rational_values[2].denominator = 100;
-            
-                gd.dirs[3].tag = GPSLongitudeRef;
-                gd.dirs[3].type = ASCII;
-                gd.dirs[3].count = 2;
-                gd.dirs[3].byte_values = (unsigned char*)malloc(gd.dirs[3].count);
-                snprintf((char*)gd.dirs[3].byte_values, gd.dirs[3].count, "%c", match->rmc->lon_ref);
-            
-                gd.dirs[4].tag = GPSLongitude;
-                gd.dirs[4].type = RATIONAL;
-                gd.dirs[4].count = 3;
-                gd.dirs[4].rational_values = (rational_t*)malloc(gd.dirs[4].count * sizeof(rational_t));
-                gd.dirs[4].rational_values[0].numerator = (int)match->rmc->longitude / 100;
-                gd.dirs[4].rational_values[0].denominator = 1;
-                gd.dirs[4].rational_values[1].numerator = (int)match->rmc->longitude % 100;
-                gd.dirs[4].rational_values[1].denominator = 1;
-                gd.dirs[4].rational_values[2].numerator = (int)(match->rmc->longitude * 10000) % 10000;
-                gd.dirs[4].rational_values[2].denominator = 100;
+                gd.dirs[index].tag = GPSLatitudeRef;
+                gd.dirs[index].type = ASCII;
+                gd.dirs[index].count = 2;
+                gd.dirs[index].byte_values = (unsigned char*)malloc(gd.dirs[index].count);
+                snprintf((char*)gd.dirs[index].byte_values, gd.dirs[index].count, "%c", match->rmc->lat_ref);
+                ++index;
+                
+                gd.dirs[index].tag = GPSLatitude;
+                gd.dirs[index].type = RATIONAL;
+                gd.dirs[index].count = 3;
+                gd.dirs[index].rational_values = (rational_t*)malloc(gd.dirs[index].count * sizeof(rational_t));
+                gd.dirs[index].rational_values[0].numerator = (int)match->rmc->latitude / 100;
+                gd.dirs[index].rational_values[0].denominator = 1;
+                gd.dirs[index].rational_values[1].numerator = (int)match->rmc->latitude % 100;
+                gd.dirs[index].rational_values[1].denominator = 1;
+                gd.dirs[index].rational_values[2].numerator = (int)(match->rmc->latitude * 10000) % 10000;
+                gd.dirs[index].rational_values[2].denominator = 100;
+                ++index;
+                
+                gd.dirs[index].tag = GPSLongitudeRef;
+                gd.dirs[index].type = ASCII;
+                gd.dirs[index].count = 2;
+                gd.dirs[index].byte_values = (unsigned char*)malloc(gd.dirs[index].count);
+                snprintf((char*)gd.dirs[index].byte_values, gd.dirs[index].count, "%c", match->rmc->lon_ref);
+                ++index;
+                
+                gd.dirs[index].tag = GPSLongitude;
+                gd.dirs[index].type = RATIONAL;
+                gd.dirs[index].count = 3;
+                gd.dirs[index].rational_values = (rational_t*)malloc(gd.dirs[index].count * sizeof(rational_t));
+                gd.dirs[index].rational_values[0].numerator = (int)match->rmc->longitude / 100;
+                gd.dirs[index].rational_values[0].denominator = 1;
+                gd.dirs[index].rational_values[1].numerator = (int)match->rmc->longitude % 100;
+                gd.dirs[index].rational_values[1].denominator = 1;
+                gd.dirs[index].rational_values[2].numerator = (int)(match->rmc->longitude * 10000) % 10000;
+                gd.dirs[index].rational_values[2].denominator = 100;
+                ++index;
+                
+                /* only report altitude if we have a geoid height */
+                if(fabs(match->rmc->geoid_ht) > 1e-3)
+                {
+                    gd.dirs[index].tag = GPSAltitudeRef;
+                    gd.dirs[index].type = BYTE;
+                    gd.dirs[index].count = 1;
+                    gd.dirs[index].byte_values = (unsigned char*)malloc(gd.dirs[index].count * sizeof(char));
+                    gd.dirs[index].byte_values[0] = (match->rmc->altitude < 0) ? 1 : 0;
+                    ++index;
+                    
+                    gd.dirs[index].tag = GPSAltitude;
+                    gd.dirs[index].type = RATIONAL;
+                    gd.dirs[index].count = 1;
+                    gd.dirs[index].rational_values = (rational_t*)malloc(gd.dirs[index].count * sizeof(rational_t));
+                    gd.dirs[index].rational_values[0].numerator = (int)(match->rmc->altitude * 10);
+                    gd.dirs[index].rational_values[0].denominator = 10;
+                    ++index;
 
+                    gd.dirs[index].tag = GPSMapDatum;
+                    gd.dirs[index].type = ASCII;
+                    gd.dirs[index].count = strlen("WGS-84")+1;
+                    gd.dirs[index].byte_values = (unsigned char*)malloc(gd.dirs[index].count * sizeof(char));
+                    strncpy((char*)gd.dirs[index].byte_values, "WGS-84", gd.dirs[index].count);
+                    ++index;
+                }
+                
                 /* convert time from gps device back to struct tm format */
                 gmtime_r(&(match->rmc->when), &t);
             
-                gd.dirs[5].tag = GPSTimeStamp;
-                gd.dirs[5].type = RATIONAL;
-                gd.dirs[5].count = 3;
-                gd.dirs[5].rational_values = (rational_t*)malloc(gd.dirs[5].count * sizeof(rational_t));
-                gd.dirs[5].rational_values[0].numerator = t.tm_hour;
-                gd.dirs[5].rational_values[0].denominator = 1;
-                gd.dirs[5].rational_values[1].numerator = t.tm_min;
-                gd.dirs[5].rational_values[1].denominator = 1;
-                gd.dirs[5].rational_values[2].numerator = t.tm_sec;
-                gd.dirs[5].rational_values[2].denominator = 1;
-            
-                gd.dirs[6].tag = GPSDateStamp;
-                gd.dirs[6].type = ASCII;
-                gd.dirs[6].count = strlen("yyyy:mm:dd")+1;
-                gd.dirs[6].byte_values = (unsigned char*)malloc((gd.dirs[6].count+1) * sizeof(char));
-                snprintf((char*)gd.dirs[6].byte_values, gd.dirs[6].count,
+                gd.dirs[index].tag = GPSTimeStamp;
+                gd.dirs[index].type = RATIONAL;
+                gd.dirs[index].count = 3;
+                gd.dirs[index].rational_values = (rational_t*)malloc(gd.dirs[index].count * sizeof(rational_t));
+                gd.dirs[index].rational_values[0].numerator = t.tm_hour;
+                gd.dirs[index].rational_values[0].denominator = 1;
+                gd.dirs[index].rational_values[1].numerator = t.tm_min;
+                gd.dirs[index].rational_values[1].denominator = 1;
+                gd.dirs[index].rational_values[2].numerator = t.tm_sec;
+                gd.dirs[index].rational_values[2].denominator = 1;
+                ++index;
+                
+                gd.dirs[index].tag = GPSDateStamp;
+                gd.dirs[index].type = ASCII;
+                gd.dirs[index].count = strlen("yyyy:mm:dd")+1;
+                gd.dirs[index].byte_values = (unsigned char*)malloc((gd.dirs[index].count+1) * sizeof(char));
+                snprintf((char*)gd.dirs[index].byte_values, gd.dirs[index].count,
                          "%04d:%02d:%02d", t.tm_year+1900, t.tm_mon+1, t.tm_mday);
+                ++index;
+                
                 /* write the new gps information */
                 assert(gps_offset > 0);
-
                 fseek(fp, gps_offset, SEEK_SET);
                 ifd_write(fp, &gd);
 
-                printf("file '%s' geotagged successfully...\n", argv[optind]);
                 ifd_free(&gd);
                 break;
             }

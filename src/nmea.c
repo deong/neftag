@@ -11,7 +11,7 @@
 #include "util.h"
 #include "csv.h"
 
-void parse_nmea_file(FILE* fp, waypoint_t** rows, int* num_recs)
+void parse_nmea_file(FILE* fp, sentence_t** rows, int* num_recs)
 {
     char** toks;
     char*  line;
@@ -32,6 +32,12 @@ void parse_nmea_file(FILE* fp, waypoint_t** rows, int* num_recs)
             (*rows)[*num_recs].rmc = (rmc_t*)malloc(sizeof(rmc_t));
             init_rmc_rec((*rows)[(*num_recs)++].rmc, toks);
         }
+        else if(strncmp(toks[0], "$GPGGA", MAX_TOKEN_LEN) == 0)
+        {
+            /* if first record is a GPGGA record, ignore it */
+            if(*num_recs > 0)
+                process_gga_rec((*rows)[(*num_recs)-1].rmc, toks);
+        }
         else
         {
             /* skip other sentence types */
@@ -41,10 +47,10 @@ void parse_nmea_file(FILE* fp, waypoint_t** rows, int* num_recs)
         if(*num_recs >= max_recs)
         {
             max_recs += 1024;
-            *rows = (waypoint_t*)realloc(*rows, max_recs * sizeof(waypoint_t));
+            *rows = (sentence_t*)realloc(*rows, max_recs * sizeof(sentence_t));
             if(!*rows)
             {
-                fprintf(stderr, "error enlarging gga rows array\n");
+                fprintf(stderr, "error enlarging nmea sentences array\n");
                 exit(EXIT_FAILURE);
             }
         }
@@ -57,27 +63,23 @@ void parse_nmea_file(FILE* fp, waypoint_t** rows, int* num_recs)
 
 void init_rmc_rec(rmc_t* rec, char** toks)
 {
-    char raw_time[11];
-    char raw_date[7];
-    char tmp[3];
     struct tm fix_time;
-
+    char tmp[3];
+    
     /* time */
-    strncpy(raw_time, toks[1], sizeof(raw_time));
-    strncpy(tmp, raw_time, 2);
+    strncpy(tmp, toks[1], 2);
     fix_time.tm_hour = atoi(tmp);
-    strncpy(tmp, raw_time+2, 2);
+    strncpy(tmp, toks[1]+2, 2);
     fix_time.tm_min = atoi(tmp);
-    strncpy(tmp, raw_time+4, 2);
+    strncpy(tmp, toks[1]+4, 2);
     fix_time.tm_sec = atoi(tmp);
 
     /* date */
-    strncpy(raw_date, toks[9], sizeof(raw_date));
-    strncpy(tmp, raw_date, 2);
+    strncpy(tmp, toks[9], 2);
     fix_time.tm_mday = atoi(tmp);
-    strncpy(tmp, raw_date+2, 2);
+    strncpy(tmp, toks[9]+2, 2);
     fix_time.tm_mon = atoi(tmp) - 1;
-    strncpy(tmp, raw_date+4, 2);
+    strncpy(tmp, toks[9]+4, 2);
     fix_time.tm_year = 2000 + atoi(tmp) - 1900;
 
     /* set the offset from UTC to 0, as GPS reports times in UTC anyway */
@@ -91,9 +93,26 @@ void init_rmc_rec(rmc_t* rec, char** toks)
     rec->lon_ref = toks[6][0];
     rec->speed = atof(toks[7]);
     rec->heading = atof(toks[8]);
+
+    /* these fields aren't part of GPRMS sentence; we'll add them later */
+    rec->altitude = 0;
+    rec->geoid_ht = 0;
 }
 
-waypoint_t* find_location_at(waypoint_t* rows, unsigned int nrows, time_t ts, int epsilon)
+void process_gga_rec(rmc_t* rec, char** toks)
+{
+    /* if we've already seen a more accurate GPGGA record and used it,
+       then bail */
+    if(rec->altitude > 1e-3)
+        return;
+    
+    /* update the previous rmc_t record with the altitude data
+       from the currently parsed GPGGA tokens */
+    rec->altitude = atof(toks[9]);
+    rec->geoid_ht = atof(toks[11]);
+}
+    
+sentence_t* find_location_at(sentence_t* rows, unsigned int nrows, time_t ts, int epsilon)
 {
     int low = 0;
     int mid;

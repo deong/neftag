@@ -9,8 +9,10 @@
 #include <stdio.h>
 #include <time.h>
 
-#define GPGGA 0
-#define GPRMC 1
+typedef enum
+{
+    GPRMC=0
+} sentence_id;
 
 typedef struct
 {
@@ -22,20 +24,23 @@ typedef struct
     char lon_ref;
     double speed; /* in knots */
     double heading; /* in degrees */
+    double altitude; /* in meters */
+    double geoid_ht; /* in meters */
 } rmc_t;
 
 typedef struct
 {
-    unsigned int record_type;
+    sentence_id record_type;
     union
     {
         rmc_t* rmc;
     };
-} waypoint_t;
+} sentence_t;
 
-void parse_nmea_file(FILE* fp, waypoint_t** rows, int* num_rows);
+void parse_nmea_file(FILE* fp, sentence_t** rows, int* num_rows);
 void init_rmc_rec(rmc_t* rec, char** toks);
-waypoint_t* find_location_at(waypoint_t* rows, unsigned int nrows, time_t timestamp,
+void process_gga_rec(rmc_t* rec, char** toks);
+sentence_t* find_location_at(sentence_t* rows, unsigned int nrows, time_t timestamp,
     int epsilon);
 
 #endif
