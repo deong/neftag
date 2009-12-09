@@ -7,10 +7,13 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <math.h>
 #include "tiff.h"
 #include "util.h"
 #include "csv.h"
 #include "date.h"
+#include "nmea.h"
+#include "nikond90.h"
 
 /* size in bytes of each of the TIFF data types */
 unsigned int type_bytes[13] = {-1, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8};
@@ -18,7 +21,11 @@ unsigned int type_bytes[13] = {-1, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8, 4, 8};
 /* little or big endian */
 unsigned int byte_order;
 
-
+/*
+ * load an ifd_t from a given tiff file
+ * reads all the direntry_t blocks and sets up the next_offset pointer
+ * for the block
+ */
 void ifd_load(FILE* f, ifd_t* ifd)
 {
     /* must be called when the file pointer is at the beginning of the IFD */
@@ -171,6 +178,9 @@ void ifd_load(FILE* f, ifd_t* ifd)
     ifd->next_offset = read_uint(f);
 }
 
+/*
+ * free any allocated memory inside an ifd_t
+ */
 void ifd_free(ifd_t* ifd)
 {
     int i;
@@ -212,6 +222,10 @@ void ifd_free(ifd_t* ifd)
     free(ifd->dirs);
 }
 
+/*
+ * check the magic bytes at the beginning of the file to make sure it's
+ * really a tiff file, and set the byte ordering in use in the file
+ */
 int valid_tiff_file(FILE* f)
 {
     /* assume that file pointer is at offset 0 */
@@ -235,6 +249,9 @@ int valid_tiff_file(FILE* f)
     return 1;
 }
 
+/*
+ * write a new ifd_t block into the given tiff file
+ */
 void ifd_write(FILE* f, ifd_t* ifd)
 {
     /* ifd is the GPSInfoIFD structure; file pointer of f must be positioned
@@ -380,6 +397,9 @@ void ifd_write(FILE* f, ifd_t* ifd)
     write_uint(f, ifd->next_offset);
 }
 
+/*
+ * debugging aid to print out the information in a particular direntry_t
+ */
 void print_values(direntry_t* dir)
 {
     int i;
@@ -462,4 +482,139 @@ void parse_datetime(const char* dt, struct tm* t)
     t->tm_hour = atoi(toks[3]);
     t->tm_min = atoi(toks[4]);
     t->tm_sec = atoi(toks[5]);
+}
+
+/*
+ * given an ifd_t structure for the gps information and a location_t
+ * structure recorded from the gps logger, populate the useful fields
+ * to write the gps info into the tiff headers
+ */
+void populate_gps_info_ifd(ifd_t* ifd, location_t* match)
+{
+    int index = 0;
+    struct tm t;
+    
+    /* now fill the gps info ifd structure */
+    if(fabs(match->geoid_ht) > 1e-3)
+        ifd->count = 10;
+    else
+        ifd->count = 7;
+    ifd->dirs = (direntry_t*)malloc(ifd->count * sizeof(direntry_t));
+
+    /* hard coded version id */
+    ifd->dirs[index].tag = GPSVersionID;
+    ifd->dirs[index].type = BYTE;
+    ifd->dirs[index].count = 4;
+    ifd->dirs[index].byte_values = (unsigned char*)malloc(ifd->dirs[index].count * sizeof(char));
+    ifd->dirs[index].byte_values[0] = 2;
+    ifd->dirs[index].byte_values[1] = 2;
+    ifd->dirs[index].byte_values[2] = 0;
+    ifd->dirs[index].byte_values[3] = 0;
+    ++index;
+
+    /* latitude ref is "N" or "S" */
+    ifd->dirs[index].tag = GPSLatitudeRef;
+    ifd->dirs[index].type = ASCII;
+    ifd->dirs[index].count = 2;
+    ifd->dirs[index].byte_values = (unsigned char*)malloc(ifd->dirs[index].count);
+    snprintf((char*)ifd->dirs[index].byte_values, ifd->dirs[index].count, "%c", match->lat_ref);
+    ++index;
+
+    /* latitudes recorded in degrees, minutes, seconds as a triple of rational numbers */
+    ifd->dirs[index].tag = GPSLatitude;
+    ifd->dirs[index].type = RATIONAL;
+    ifd->dirs[index].count = 3;
+    ifd->dirs[index].rational_values = (rational_t*)malloc(ifd->dirs[index].count * sizeof(rational_t));
+    ifd->dirs[index].rational_values[0].numerator = (int)match->latitude / 100;
+    ifd->dirs[index].rational_values[0].denominator = 1;
+    ifd->dirs[index].rational_values[1].numerator = (int)match->latitude % 100;
+    ifd->dirs[index].rational_values[1].denominator = 1;
+    ifd->dirs[index].rational_values[2].numerator = (int)(match->latitude * 10000) % 10000;
+    ifd->dirs[index].rational_values[2].denominator = 100;
+    ++index;
+
+    /* longitude ref is "E" or "W" */
+    ifd->dirs[index].tag = GPSLongitudeRef;
+    ifd->dirs[index].type = ASCII;
+    ifd->dirs[index].count = 2;
+    ifd->dirs[index].byte_values = (unsigned char*)malloc(ifd->dirs[index].count);
+    snprintf((char*)ifd->dirs[index].byte_values, ifd->dirs[index].count, "%c", match->lon_ref);
+    ++index;
+
+    /* longitude recorded in degrees, minutes, seconds as a triple of rational numbers */
+    ifd->dirs[index].tag = GPSLongitude;
+    ifd->dirs[index].type = RATIONAL;
+    ifd->dirs[index].count = 3;
+    ifd->dirs[index].rational_values = (rational_t*)malloc(ifd->dirs[index].count * sizeof(rational_t));
+    ifd->dirs[index].rational_values[0].numerator = (int)match->longitude / 100;
+    ifd->dirs[index].rational_values[0].denominator = 1;
+    ifd->dirs[index].rational_values[1].numerator = (int)match->longitude % 100;
+    ifd->dirs[index].rational_values[1].denominator = 1;
+    ifd->dirs[index].rational_values[2].numerator = (int)(match->longitude * 10000) % 10000;
+    ifd->dirs[index].rational_values[2].denominator = 100;
+    ++index;
+                
+    /* only report altitude if we have a geoid height
+     * 
+     * geoid height is the correction required to get accurate MSL (mean sea level)
+     * altitude information. For my SiRF device at least, it appears that the altitude
+     * field is already updated with the correction, so as long as the GPS receiver
+     * had a good enough fix to record a geoid height, then the raw altitude readout
+     * should be accurate. On some devices, you may have to record the altitude as
+     * "altitude - geoid_height".
+     */
+    if(fabs(match->geoid_ht) > 1e-3)
+    {
+        /* altitude ref is different than other ref fields.  it's a single byte that's
+           0 for "above sea level" and 1 for "below sea level" */
+        ifd->dirs[index].tag = GPSAltitudeRef;
+        ifd->dirs[index].type = BYTE;
+        ifd->dirs[index].count = 1;
+        ifd->dirs[index].byte_values = (unsigned char*)malloc(ifd->dirs[index].count * sizeof(char));
+        ifd->dirs[index].byte_values[0] = (match->altitude < 0) ? 1 : 0;
+        ++index;
+
+        /* altitude recorded as a rational in meters */
+        ifd->dirs[index].tag = GPSAltitude;
+        ifd->dirs[index].type = RATIONAL;
+        ifd->dirs[index].count = 1;
+        ifd->dirs[index].rational_values = (rational_t*)malloc(ifd->dirs[index].count * sizeof(rational_t));
+        ifd->dirs[index].rational_values[0].numerator = (int)(match->altitude * 10);
+        ifd->dirs[index].rational_values[0].denominator = 10;
+        ++index;
+
+        /* geoidesic specification is WGS-84 */
+        ifd->dirs[index].tag = GPSMapDatum;
+        ifd->dirs[index].type = ASCII;
+        ifd->dirs[index].count = strlen("WGS-84")+1;
+        ifd->dirs[index].byte_values = (unsigned char*)malloc(ifd->dirs[index].count * sizeof(char));
+        strncpy((char*)ifd->dirs[index].byte_values, "WGS-84", ifd->dirs[index].count);
+        ++index;
+    }
+                
+    /* convert time from gps device back to struct tm format
+       so we can write accurate GPS timestamp information */
+    gmtime_r(&(match->when), &t);
+
+    /* again, time stored as three rationals for h/m/s */
+    ifd->dirs[index].tag = GPSTimeStamp;
+    ifd->dirs[index].type = RATIONAL;
+    ifd->dirs[index].count = 3;
+    ifd->dirs[index].rational_values = (rational_t*)malloc(ifd->dirs[index].count * sizeof(rational_t));
+    ifd->dirs[index].rational_values[0].numerator = t.tm_hour;
+    ifd->dirs[index].rational_values[0].denominator = 1;
+    ifd->dirs[index].rational_values[1].numerator = t.tm_min;
+    ifd->dirs[index].rational_values[1].denominator = 1;
+    ifd->dirs[index].rational_values[2].numerator = t.tm_sec;
+    ifd->dirs[index].rational_values[2].denominator = 1;
+    ++index;
+
+    /* date, on the other hand, is stored as an ascii string */
+    ifd->dirs[index].tag = GPSDateStamp;
+    ifd->dirs[index].type = ASCII;
+    ifd->dirs[index].count = strlen("yyyy:mm:dd")+1;
+    ifd->dirs[index].byte_values = (unsigned char*)malloc((ifd->dirs[index].count+1) * sizeof(char));
+    snprintf((char*)ifd->dirs[index].byte_values, ifd->dirs[index].count,
+             "%04d:%02d:%02d", t.tm_year+1900, t.tm_mon+1, t.tm_mday);
+    ++index;
 }

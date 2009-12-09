@@ -11,11 +11,13 @@
 #include "util.h"
 #include "csv.h"
 
-void parse_nmea_file(FILE* fp, sentence_t** rows, int* num_recs)
+/*
+ * parse a file of NMEA sentences into an array of location_t records
+ */
+void parse_nmea_file(FILE* fp, location_t** rows, int* num_recs, int max_size)
 {
     char** toks;
     char*  line;
-    int    max_recs = 1024;
     
     /* init some memory to use to parse the nmea file */
     toks = (char**)malloc(NUM_TOKENS * sizeof(char*));
@@ -28,26 +30,25 @@ void parse_nmea_file(FILE* fp, sentence_t** rows, int* num_recs)
         parse_line(line, ",", toks);
         if(strncmp(toks[0], "$GPRMC", MAX_TOKEN_LEN) == 0)
         {
-            (*rows)[*num_recs].record_type = GPRMC;
-            (*rows)[*num_recs].rmc = (rmc_t*)malloc(sizeof(rmc_t));
-            init_rmc_rec((*rows)[(*num_recs)++].rmc, toks);
+            init_rmc_rec(&(*rows)[(*num_recs)++], toks);
         }
         else if(strncmp(toks[0], "$GPGGA", MAX_TOKEN_LEN) == 0)
         {
             /* if first record is a GPGGA record, ignore it */
             if(*num_recs > 0)
-                process_gga_rec((*rows)[(*num_recs)-1].rmc, toks);
+                process_gga_rec(&(*rows)[(*num_recs)-1], toks);
         }
         else
         {
             /* skip other sentence types */
             continue;
         }
-        
-        if(*num_recs >= max_recs)
+
+        /* if we've run out of space, realloc twice the space and keep going */
+        if(*num_recs >= max_size)
         {
-            max_recs += 1024;
-            *rows = (sentence_t*)realloc(*rows, max_recs * sizeof(sentence_t));
+            max_size = max_size * 2;
+            *rows = (location_t*)realloc(*rows, max_size * sizeof(location_t));
             if(!*rows)
             {
                 fprintf(stderr, "error enlarging nmea sentences array\n");
@@ -55,13 +56,14 @@ void parse_nmea_file(FILE* fp, sentence_t** rows, int* num_recs)
             }
         }
     }
-
-    /* free the memory used by the nmea parsing */
     free(toks);
     free(line);
 }
 
-void init_rmc_rec(rmc_t* rec, char** toks)
+/*
+ * builds up a location_t record based on a parsed GPRMC sentence
+ */
+void init_rmc_rec(location_t* rec, char** toks)
 {
     struct tm fix_time;
     char tmp[3];
@@ -97,22 +99,40 @@ void init_rmc_rec(rmc_t* rec, char** toks)
     /* these fields aren't part of GPRMS sentence; we'll add them later */
     rec->altitude = 0;
     rec->geoid_ht = 0;
+    rec->quality = 0;
+    rec->num_sat = 0;
 }
 
-void process_gga_rec(rmc_t* rec, char** toks)
+/*
+ * updates a given location_t record with information from a parsed GPGGA sentence
+ */
+void process_gga_rec(location_t* rec, char** toks)
 {
     /* if we've already seen a more accurate GPGGA record and used it,
-       then bail */
+       then bail.  this is because there may be multiple GPGGA records
+       per GPRMC record, and we want to use the first one succeeding a
+       GPRMC record, as it should have the closest timestamp. */
     if(rec->altitude > 1e-3)
         return;
-    
-    /* update the previous rmc_t record with the altitude data
-       from the currently parsed GPGGA tokens */
+
+    /* make sure we have at least some kind of fix */
+    if(atoi(toks[6]) == 0)
+        return;
+
+    /* update the previous location_t record with the fix and altitude data
+       from the currently parsed GPGGA sentence tokens */
+    rec->quality = atoi(toks[6]);
+    rec->num_sat = atoi(toks[7]);
     rec->altitude = atof(toks[9]);
     rec->geoid_ht = atof(toks[11]);
 }
-    
-sentence_t* find_location_at(sentence_t* rows, unsigned int nrows, time_t ts, int epsilon)
+
+/*
+ * custom binary search that looks for the record in the array whose timestamp
+ * is nearest to the given timestamp.  if no records are stamped within epsilon
+ * seconds, returns NULL.
+ */
+location_t* find_location_at(location_t* rows, unsigned int nrows, time_t ts, int epsilon)
 {
     int low = 0;
     int mid;
@@ -121,20 +141,20 @@ sentence_t* find_location_at(sentence_t* rows, unsigned int nrows, time_t ts, in
     while(low < high)
     {
         mid = (low + high) / 2;
-        if(rows[mid].rmc->when < ts)
+        if(rows[mid].when < ts)
             low = mid;
-        else if(rows[mid].rmc->when > ts)
+        else if(rows[mid].when > ts)
             high = mid;
         else
             return &rows[mid];
     }
 
     /* low has passed high, so check which is closer to desired time */
-    if(fabs(rows[low].rmc->when - ts) < fabs(rows[high].rmc->when - ts) &&
-       fabs(rows[low].rmc->when - ts) < epsilon)
+    if(fabs(rows[low].when - ts) < fabs(rows[high].when - ts) &&
+       fabs(rows[low].when - ts) < epsilon)
         return &rows[low];
-    else if(fabs(rows[high].rmc->when - ts) < fabs(rows[low].rmc->when - ts) &&
-            fabs(rows[high].rmc->when - ts) < epsilon)
+    else if(fabs(rows[high].when - ts) < fabs(rows[low].when - ts) &&
+            fabs(rows[high].when - ts) < epsilon)
         return &rows[high];
 
     /* no record found within required time limit */

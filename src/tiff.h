@@ -4,6 +4,7 @@
  */
 
 #include <time.h>
+#include "nmea.h"
 
 #ifndef _TIFF_H_
 #define _TIFF_H_
@@ -68,5 +69,6 @@ int valid_tiff_file(FILE* f);
 void ifd_write(FILE* f, ifd_t* ifd);
 void print_values(direntry_t* dir);
 void parse_datetime(const char* dt, struct tm* t);
+void populate_gps_info_ifd(ifd_t* ifd, location_t* match);
 
 #endif
