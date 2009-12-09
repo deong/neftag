@@ -21,10 +21,13 @@ static void print_usage();
 
 void print_usage()
 {
-    printf("usage: d90tag [-o utc_offset] <gpslog> <rawfile>+\n\n");
-    printf("\tnote that utc_offset is specified as X where GMT=local+X,\n");
-    printf("\te.g., CST is GMT-6, so to tag images taken in CST, specify\n");
-    printf("\t-o6, not -o-6\n\n");
+    printf("usage: d90tag [-o utc_offset] [-w window_size] <gpslog> <rawfile>+\n\n"
+           "\tutc_offset is specified as X where GMT=local+X,\n"
+           "\te.g., CST is GMT-6, so to tag images taken in CST, specify\n"
+           "\t-o6, not -o-6. (default: 0)\n\n"
+           "\twindow_size sets maximum number of seconds that the GPS timestamp\n"
+           "\tmay differ from the camera's timestamp and still be considered to\n"
+           "\tmatch. (default 3600, e.g., one hour)\n\n");
 }
 
 int main(int argc, char** argv)
@@ -41,6 +44,7 @@ int main(int argc, char** argv)
     location_t* rows = (location_t*)malloc(init_size * sizeof(location_t));
     char ch;
     int tzoffset = 0;
+    int window_size = 3600;
     
     if(argc < 3)
     {
@@ -48,12 +52,15 @@ int main(int argc, char** argv)
         return EXIT_FAILURE;
     }
 
-    while((ch = getopt(argc, argv, "ho:")) != -1)
+    while((ch = getopt(argc, argv, "ho:w:")) != -1)
     {
         switch(ch)
         {
         case 'o': // time zone offset from UTC
             tzoffset = atoi(optarg);
+            break;
+        case 'w':
+            window_size = atoi(optarg);
             break;
         case 'h':
             print_usage();
@@ -123,7 +130,7 @@ int main(int argc, char** argv)
                 add_offset(&t, tzoffset);
                 utc_time = timegm(&t);
 
-                match = find_location_at(rows, num_rows, utc_time, 3600);
+                match = find_location_at(rows, num_rows, utc_time, window_size);
                 if(!match)
                 {
                     printf("no match found within 1 hour of photo '%s'...skipping\n", argv[optind]);
