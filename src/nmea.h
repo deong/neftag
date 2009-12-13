@@ -30,5 +30,6 @@ void init_rmc_rec(location_t* rec, char** toks);
 void process_gga_rec(location_t* rec, char** toks);
 location_t* find_location_at(location_t* rows, unsigned int nrows, time_t timestamp,
     int epsilon);
+void dec2dms(double dec, int* deg, int* min, double* sec);
 
 #endif

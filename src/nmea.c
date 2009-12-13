@@ -160,3 +160,17 @@ location_t* find_location_at(location_t* rows, unsigned int nrows, time_t ts, in
     /* no record found within required time limit */
     return NULL;
 }
+
+/* convert nmea Dm.H format to degrees, minutes, seconds */
+void dec2dms(double dec, int* deg, int* min, double* sec)
+{
+    /* nmea format is weird.  12 deg, 34' 56.78" is stored as 1234.5678 */
+    double dec_min;
+    *deg = (int)floor(dec / 100);  /* 1234.5678 => 12 degrees */
+    dec_min = dec - (*deg * 100);  /* 1234.5678 - (12 * 100) => 34.5678 */
+    *min = (int)floor(dec_min);    /* 34 minutes */
+    *sec = (dec_min - *min) * 60;  /* (34.5678 - 34) * 60 => 34.068 sec */
+}
+
+    
+    

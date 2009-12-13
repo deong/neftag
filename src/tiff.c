@@ -493,6 +493,9 @@ void populate_gps_info_ifd(ifd_t* ifd, location_t* match)
 {
     int index = 0;
     struct tm t;
+    int deg;
+    int min;
+    double sec;
     
     /* now fill the gps info ifd structure */
     if(fabs(match->geoid_ht) > 1e-3)
@@ -521,15 +524,16 @@ void populate_gps_info_ifd(ifd_t* ifd, location_t* match)
     ++index;
 
     /* latitudes recorded in degrees, minutes, seconds as a triple of rational numbers */
+    dec2dms(match->latitude, &deg, &min, &sec);
     ifd->dirs[index].tag = GPSLatitude;
     ifd->dirs[index].type = RATIONAL;
     ifd->dirs[index].count = 3;
     ifd->dirs[index].rational_values = (rational_t*)malloc(ifd->dirs[index].count * sizeof(rational_t));
-    ifd->dirs[index].rational_values[0].numerator = (int32)match->latitude / 100;
+    ifd->dirs[index].rational_values[0].numerator = deg;
     ifd->dirs[index].rational_values[0].denominator = 1;
-    ifd->dirs[index].rational_values[1].numerator = (int32)match->latitude % 100;
+    ifd->dirs[index].rational_values[1].numerator = min;
     ifd->dirs[index].rational_values[1].denominator = 1;
-    ifd->dirs[index].rational_values[2].numerator = (int32)(match->latitude * 10000) % 10000;
+    ifd->dirs[index].rational_values[2].numerator = (int32)floor(sec * 100);
     ifd->dirs[index].rational_values[2].denominator = 100;
     ++index;
 
@@ -542,15 +546,16 @@ void populate_gps_info_ifd(ifd_t* ifd, location_t* match)
     ++index;
 
     /* longitude recorded in degrees, minutes, seconds as a triple of rational numbers */
+    dec2dms(match->longitude, &deg, &min, &sec);
     ifd->dirs[index].tag = GPSLongitude;
     ifd->dirs[index].type = RATIONAL;
     ifd->dirs[index].count = 3;
     ifd->dirs[index].rational_values = (rational_t*)malloc(ifd->dirs[index].count * sizeof(rational_t));
-    ifd->dirs[index].rational_values[0].numerator = (int32)match->longitude / 100;
+    ifd->dirs[index].rational_values[0].numerator = deg;
     ifd->dirs[index].rational_values[0].denominator = 1;
-    ifd->dirs[index].rational_values[1].numerator = (int32)match->longitude % 100;
+    ifd->dirs[index].rational_values[1].numerator = min;
     ifd->dirs[index].rational_values[1].denominator = 1;
-    ifd->dirs[index].rational_values[2].numerator = (int32)(match->longitude * 10000) % 10000;
+    ifd->dirs[index].rational_values[2].numerator = (int32)floor(sec * 100);
     ifd->dirs[index].rational_values[2].denominator = 100;
     ++index;
                 
