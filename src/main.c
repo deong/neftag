@@ -16,6 +16,7 @@
 #include "nmea.h"
 #include "nikond90.h"
 #include "date.h"
+#include "types.h"
 
 static void print_usage();
 
@@ -32,13 +33,13 @@ void print_usage()
 
 int main(int argc, char** argv)
 {
-    unsigned int offset;
+    unsigned int32 offset;
     unsigned int i;
     FILE* fp;
     FILE* gpsf;
     ifd_t ifd0;
     ifd_t gps_info_ifd;
-    unsigned int gps_offset = 0;
+    unsigned int32 gps_offset = 0;
     int num_rows = 0;
     int init_size = 1024;
     location_t* rows = (location_t*)malloc(init_size * sizeof(location_t));
@@ -97,7 +98,7 @@ int main(int argc, char** argv)
         }
 
         /* find the offset of the first ifd */
-        offset = read_uint(fp);
+        offset = read_uint32(fp);
         fseek(fp, offset, SEEK_SET);
         
         ifd_load(fp, &ifd0);
@@ -105,7 +106,7 @@ int main(int argc, char** argv)
         {
             if(ifd0.dirs[i].tag == GPSInfoIFDPointer) /* GPS Info IFD pointer */
             {
-                gps_offset = ifd0.dirs[i].uint_values[0];
+                gps_offset = ifd0.dirs[i].uint32_values[0];
                 fseek(fp, gps_offset, SEEK_SET);
                 ifd_load(fp, &gps_info_ifd);
             }

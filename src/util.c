@@ -7,55 +7,56 @@
 #include <stdlib.h>
 #include "util.h"
 #include "tiff.h"
+#include "types.h"
 
-unsigned char read_byte(FILE* f)
+unsigned byte read_byte(FILE* f)
 {
-    unsigned char b;
-    fread(&b, sizeof(char), 1, f);
+    unsigned byte b;
+    fread(&b, sizeof(byte), 1, f);
     return b;
 }
 
-void write_byte(FILE* f, unsigned char b)
+void write_byte(FILE* f, unsigned byte b)
 {
-    fwrite(&b, sizeof(char), 1, f);
+    fwrite(&b, sizeof(byte), 1, f);
 }
 
-char read_sbyte(FILE* f)
+byte read_sbyte(FILE* f)
 {
-    char b;
-    fread(&b, sizeof(char), 1, f);
+    byte b;
+    fread(&b, sizeof(byte), 1, f);
     return b;
 }
 
-void write_sbyte(FILE* f, char b)
+void write_sbyte(FILE* f, byte b)
 {
-    fwrite(&b, sizeof(char), 1, f);
+    fwrite(&b, sizeof(byte), 1, f);
 }
 
-unsigned int read_uint(FILE* f)
+int16 read_int16(FILE* f)
 {
-    unsigned int tmp;
-    fread(&tmp, sizeof(int), 1, f);
+    int16 tmp;
+    fread(&tmp, sizeof(int16), 1, f);
     if(byte_order == TIFF_BIG_ENDIAN)
     {
-        swap_endian4(&tmp);
+        swap_endian2((unsigned int16*)&tmp);
     }
     return tmp;
 }
 
-void write_uint(FILE* f, unsigned int n)
+void write_int16(FILE* f, int16 k)
 {
     if(byte_order == TIFF_BIG_ENDIAN)
     {
-        swap_endian4(&n);
+        swap_endian2((unsigned int16*)&k);
     }
-    fwrite(&n, sizeof(unsigned int), 1, f);
+    fwrite(&k, sizeof(int16), 1, f);
 }
 
-unsigned short read_ushort(FILE* f)
+unsigned int16 read_uint16(FILE* f)
 {
-    unsigned short tmp;
-    fread(&tmp, sizeof(short), 1, f);
+    unsigned int16 tmp;
+    fread(&tmp, sizeof(int16), 1, f);
     if(byte_order == TIFF_BIG_ENDIAN)
     {
         swap_endian2(&tmp);
@@ -63,101 +64,101 @@ unsigned short read_ushort(FILE* f)
     return tmp;
 }
 
-void write_ushort(FILE* f, unsigned short k)
+void write_uint16(FILE* f, unsigned int16 k)
 {
     if(byte_order == TIFF_BIG_ENDIAN)
     {
         swap_endian2(&k);
     }
-    fwrite(&k, sizeof(unsigned short), 1, f);
+    fwrite(&k, sizeof(unsigned int16), 1, f);
 }
 
-int read_int(FILE* f)
+unsigned int32 read_uint32(FILE* f)
 {
-    int tmp;
-    fread(&tmp, sizeof(int), 1, f);
+    unsigned int32 tmp;
+    fread(&tmp, sizeof(int32), 1, f);
     if(byte_order == TIFF_BIG_ENDIAN)
     {
-        swap_endian4((unsigned int*)&tmp);
+        swap_endian4(&tmp);
     }
     return tmp;
 }
 
-void write_int(FILE* f, int n)
+void write_uint32(FILE* f, unsigned int32 n)
 {
     if(byte_order == TIFF_BIG_ENDIAN)
     {
-        swap_endian4((unsigned int*)&n);
+        swap_endian4(&n);
     }
-    fwrite(&n, sizeof(int), 1, f);
+    fwrite(&n, sizeof(unsigned int32), 1, f);
 }
 
-short read_short(FILE* f)
+int32 read_int32(FILE* f)
 {
-    short tmp;
-    fread(&tmp, 1, sizeof(short), f);
+    int32 tmp;
+    fread(&tmp, sizeof(int32), 1, f);
     if(byte_order == TIFF_BIG_ENDIAN)
     {
-        swap_endian2((unsigned short*)&tmp);
-    }
-    return tmp;
-}
-
-void write_short(FILE* f, short k)
-{
-    if(byte_order == TIFF_BIG_ENDIAN)
-    {
-        swap_endian2((unsigned short*)&k);
-    }
-    fwrite(&k, sizeof(short), 1, f);
-}
-
-float read_float(FILE* f)
-{
-    float tmp;
-    fread(&tmp, 1, sizeof(float), f);
-    if(byte_order == TIFF_BIG_ENDIAN)
-    {
-        swap_endian4((unsigned int*)&tmp);
+        swap_endian4((unsigned int32*)&tmp);
     }
     return tmp;
 }
 
-void write_float(FILE* f, float x)
+void write_int32(FILE* f, int32 n)
 {
     if(byte_order == TIFF_BIG_ENDIAN)
     {
-        swap_endian4((unsigned int*)&x);
+        swap_endian4((unsigned int32*)&n);
     }
-    fwrite(&x, sizeof(float), 1, f);
+    fwrite(&n, sizeof(int32), 1, f);
 }
 
-double read_double(FILE* f)
+float32 read_float32(FILE* f)
 {
-    float tmp;
-    fread(&tmp, 1, sizeof(float), f);
+    float32 tmp;
+    fread(&tmp, 1, sizeof(float32), f);
     if(byte_order == TIFF_BIG_ENDIAN)
     {
-        swap_endian8((unsigned long*)&tmp);
+        swap_endian4((unsigned int32*)&tmp);
     }
     return tmp;
 }
 
-void write_double(FILE* f, double x)
+void write_float32(FILE* f, float32 x)
 {
     if(byte_order == TIFF_BIG_ENDIAN)
     {
-        swap_endian8((unsigned long*)&x);
+        swap_endian4((unsigned int32*)&x);
     }
-    fwrite(&x, sizeof(double), 1, f);
+    fwrite(&x, sizeof(float32), 1, f);
 }
 
-void swap_endian2(unsigned short* x)
+float64 read_float64(FILE* f)
+{
+    float64 tmp;
+    fread(&tmp, 1, sizeof(float64), f);
+    if(byte_order == TIFF_BIG_ENDIAN)
+    {
+        swap_endian8((unsigned int64*)&tmp);
+    }
+    return tmp;
+}
+
+void write_float64(FILE* f, float64 x)
+{
+    if(byte_order == TIFF_BIG_ENDIAN)
+    {
+        swap_endian8((unsigned int64*)&x);
+    }
+    fwrite(&x, sizeof(float64), 1, f);
+}
+
+void swap_endian2(unsigned int16* x)
 {
     *x = (*x>>8) | (*x<<8);
 }
 
-void swap_endian4(unsigned int* x)
+void swap_endian4(unsigned int32* x)
 {
     *x = (*x>>24) | 
         ((*x<<8) & 0x00FF0000) |
@@ -165,7 +166,7 @@ void swap_endian4(unsigned int* x)
         (*x<<24);
 }
 
-void swap_endian8(unsigned long* x)
+void swap_endian8(unsigned int64* x)
 {
     *x = (*x>>56) | 
         ((*x<<40) & 0x00FF000000000000) |

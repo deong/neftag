@@ -5,6 +5,7 @@
 
 #include <time.h>
 #include "nmea.h"
+#include "types.h"
 
 #ifndef _TIFF_H_
 #define _TIFF_H_
@@ -33,34 +34,34 @@ extern unsigned int type_bytes[13];
 
 typedef struct
 {
-    unsigned int numerator;
-    unsigned int denominator;
+    unsigned int32 numerator;
+    unsigned int32 denominator;
 } rational_t;
 
 typedef struct
 {
-    unsigned short tag;
-    unsigned short type;
-    unsigned int count;
+    unsigned int16 tag;
+    unsigned int16 type;
+    unsigned int32 count;
     union
     {
-        unsigned char* byte_values;
-        char* sbyte_values;
-        unsigned short* ushort_values;
-        short* short_values;
-        unsigned int* uint_values;
-        int* int_values;
-        float* float_values;
-        double* double_values;
+        unsigned byte* byte_values;
+        byte* sbyte_values;
+        unsigned int16* uint16_values;
+        int16* int16_values;
+        unsigned int32* uint32_values;
+        int32* int32_values;
+        float32* float32_values;
+        float64* float64_values;
         rational_t* rational_values;
     };
 } direntry_t;
 
 typedef struct
 {
-    unsigned short count;
+    unsigned int16 count;
     direntry_t* dirs;
-    unsigned int next_offset;
+    unsigned int32 next_offset;
 } ifd_t;
 
 void ifd_load(FILE* f, ifd_t* ifd);
