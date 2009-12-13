@@ -46,6 +46,14 @@ int main(int argc, char** argv)
     char ch;
     int tzoffset = 0;
     int window_size = 3600;
+
+    /* sanity check the platform */
+    assert(sizeof(byte) == 1);
+    assert(sizeof(int16) == 2);
+    assert(sizeof(int32) == 4);
+    assert(sizeof(int64) == 8);
+    assert(sizeof(float32) == 4);
+    assert(sizeof(float64) == 8);
     
     if(argc < 3)
     {
