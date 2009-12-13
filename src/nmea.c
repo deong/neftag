@@ -137,25 +137,25 @@ location_t* find_location_at(location_t* rows, unsigned int nrows, time_t ts, in
     int low = 0;
     int mid;
     int high = nrows - 1;
-    
-    while(low < high)
+
+    while(low <= high)
     {
         mid = (low + high) / 2;
         if(rows[mid].when < ts)
-            low = mid;
+            low = mid + 1;
         else if(rows[mid].when > ts)
-            high = mid;
+            high = mid - 1;
         else
             return &rows[mid];
     }
 
     /* low has passed high, so check which is closer to desired time */
-    if(fabs(rows[low].when - ts) < fabs(rows[high].when - ts) &&
-       fabs(rows[low].when - ts) < epsilon)
-        return &rows[low];
-    else if(fabs(rows[high].when - ts) < fabs(rows[low].when - ts) &&
-            fabs(rows[high].when - ts) < epsilon)
+    if(fabs(rows[high].when - ts) <= fabs(rows[low].when - ts) &&
+       fabs(rows[high].when - ts) <= epsilon)
         return &rows[high];
+    else if(fabs(rows[low].when - ts) < fabs(rows[high].when - ts) &&
+       fabs(rows[low].when - ts) <= epsilon)
+        return &rows[low];
 
     /* no record found within required time limit */
     return NULL;

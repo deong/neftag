@@ -22,7 +22,7 @@ static void print_usage();
 
 void print_usage()
 {
-    printf("usage: d90tag [-o utc_offset] [-w window_size] <gpslog> <rawfile>+\n\n"
+    printf("usage: neftag [-o utc_offset] [-w window_size] <gpslog> <rawfile>+\n\n"
            "\tutc_offset is specified as X where GMT=local+X,\n"
            "\te.g., CST is GMT-6, so to tag images taken in CST, specify\n"
            "\t-o6, not -o-6. (default: 0)\n\n"
@@ -108,7 +108,6 @@ int main(int argc, char** argv)
         /* find the offset of the first ifd */
         offset = read_uint32(fp);
         fseek(fp, offset, SEEK_SET);
-        
         ifd_load(fp, &ifd0);
         for(i=0; i<ifd0.count; ++i)
         {
@@ -119,7 +118,7 @@ int main(int argc, char** argv)
                 ifd_load(fp, &gps_info_ifd);
             }
         }
-        
+
         /* find the DateTimeOriginal header, and use the data to match a GPS location record */
         for(i=0; i<ifd0.count; ++i)
         {
