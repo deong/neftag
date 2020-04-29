@@ -474,7 +474,7 @@ void parse_datetime(const char* dt, struct tm* t)
     }
 
     /* parse the line */
-    parse_line(tmp, ": ", toks);
+    parse_line(tmp, ": ", toks, NUM_DT_TOKENS);
 
     t->tm_year = atoi(toks[0]) - 1900;
     t->tm_mon = atoi(toks[1]) - 1;

@@ -27,7 +27,7 @@ void parse_nmea_file(FILE* fp, location_t** rows, int* num_recs, int max_size)
     line = (char*)malloc(82 * sizeof(char));
     while((line = fgets(line, 82, fp)) != NULL)
     {
-        parse_line(line, ",", toks);
+        parse_line(line, ",", toks, NUM_TOKENS);
         if(strncmp(toks[0], "$GPRMC", MAX_TOKEN_LEN) == 0)
         {
             init_rmc_rec(&(*rows)[(*num_recs)++], toks);

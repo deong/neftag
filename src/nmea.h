@@ -9,6 +9,9 @@
 #include <stdio.h>
 #include <time.h>
 
+#define NUM_TOKENS 20
+#define MAX_TOKEN_LEN 80
+
 typedef struct
 {
     time_t when;

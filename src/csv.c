@@ -12,14 +12,14 @@
  * parse a line of comma separated text into a given
  * array of tokens
  */
-void parse_line(char* line, char* sep, char** toks)
+void parse_line(char* line, char* sep, char** toks, unsigned int num_tokens)
 {
     char*  curr;
     char*  p;
     int i = 0;
 
     i=0;
-    while(line != NULL && i < NUM_TOKENS)
+    while(line != NULL && i < num_tokens)
     {
         curr = strsep(&line, sep);
         
